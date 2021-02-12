@@ -1,32 +1,25 @@
 const fs = require('fs');
+const { Query } = require('mongoose');
+const APIFeatures = require('./../utils/apiFeatures');
 const Tour = require('./../models/tourModel');
 
 const tours = JSON.parse(fs.readFileSync(`${__dirname}/../dev-data/data/tours-simple.json`));
 
-/* exports.checkId = (req, res, next, val) => {
-    console.log(`Tour id is: ${val}`);
-    if(!tours[val]){
-        return res.status(404).json({
-            status: 'fail',
-            message: 'Invalid ID'
-        })
-    }
+exports.aliasTours = (req, res, next) => {
+    req.query.limit = '5';
+    req.query.sort = '-ratingsAverage,price';
+    req.query.fields = 'name,price,ratingsAverage,summary,difficulty';
     next();
 }
 
-exports.checkBody = (req, res, next) => {
-    if (!req.body.name || !req.body.price) {
-        return res.status(400).json({
-            status: 'fail',
-            message: 'Missing name or price'
-        })
-    }
-    next();
-} */
-
 exports.getAllTours = async (req, res) => {
     try{
-        const tours = await Tour.find()
+        const features = new APIFeatures(Tour.find(), req.query)
+            .filter()
+            .sort()
+            .limitFields()
+            .paginate();
+        const tours = await features.query;
     
         res.status(200).json({
             status: 'success',
