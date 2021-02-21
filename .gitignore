@@ -1,3 +1,4 @@
 /.eslintrc.json
 /.prettierrc
 /node_modules
+/config.env
