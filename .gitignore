@@ -5,3 +5,6 @@
 .env.test
 /config.env
 /.config.env
+.cache
+.parcel-cache
+*.tgz
