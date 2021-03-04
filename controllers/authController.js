@@ -94,28 +94,43 @@ exports.protect = catchAsync(async (req, res, next) => {
     }
 
     req.user = currentUser;
+    res.locals.user = currentUser;
     next();
 });
 
-exports.isLoggedIn = catchAsync(async (req, res, next) => {
+exports.isLoggedIn = async (req, res, next) => {
     if(req.cookies.jwt){
-        const decoded = await util.promisify(jwt.verify)(req.cookies.jwt, process.env.JWT_SECRET);
+        try{
+            const decoded = await util.promisify(jwt.verify)(req.cookies.jwt, process.env.JWT_SECRET);
 
-        const currentUser = await User.findById(decoded.id);
+            const currentUser = await User.findById(decoded.id);
 
-        if(!currentUser){
+            if(!currentUser){
+                return next();
+            }
+
+            if(currentUser.changedPasswordAfter(decoded.iat)){
+                return next();
+            }
+
+            res.locals.user = currentUser;
+            return next();
+        }catch(err){
             return next();
         }
-
-        if(currentUser.changedPasswordAfter(decoded.iat)){
-            return next();
-        }
-
-        res.locals.user = currentUser;
-        return next();
     }
     next();
-});
+};
+
+exports.logout = (req,res) => {
+    res.cookie('jwt', 'loggedout', {
+        expires: new Date(Date.now() + 10000),
+        httpOnly: true
+    });
+    res.status(200).json({
+        status: 'success'
+    })
+}
 
 exports.restrictTo = (...roles) => {
     return (req, res, next) => {
@@ -178,7 +193,7 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
 exports.updatePassword = catchAsync(async (req, res, next) => {
     const user = await User.findById(req.user.id).select('+password');
 
-    if(!user || !await user.correctPassword(req.body.currentPassword, user.password)) {
+    if(!(await user.correctPassword(req.body.currentPassword, user.password))) {
         return next(new AppError('Yor current password is wrong!', 401));
     }
 
@@ -186,5 +201,5 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
     user.passwordConfirm = req.body.passwordConfirm;
     await user.save();
 
-    createSendToken(user, 201, res);
+    createSendToken(user, 200, res);
 })
